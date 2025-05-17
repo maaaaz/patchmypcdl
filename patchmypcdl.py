@@ -66,7 +66,8 @@ def download_files(pkgs_list, options):
         ret = pkg_val.result()
         if not(ret):
             print("[!] Download of the package '%s' encountered in issue" % pkgname)
-
+    return None
+    
 def list_dl_links(pkgs_list):
     for pkgname, pkg in pkgs_list.items():
         if 'dl' in pkg.keys():
