@@ -6,11 +6,10 @@ from pathlib import Path
 import re
 import os
 import argparse
-import functools
 import requests
+import functools
 import types
 import concurrent.futures
-import secrets
 import pprint
 
 from lxml.etree import fromstring as fromstringxml
@@ -22,63 +21,57 @@ PATCHMYPC_FREE_DEFINITIONS = 'https://patchmypc.com/freeupdater/definitions/defi
 
 # Options definition
 parser = argparse.ArgumentParser(description="version: " + VERSION)
-parser.add_argument('-i', '--input-file', help="Input file", required = True)
-parser.add_argument('-s', '--do-not-download', help="Do not download anything, simply print download URLs", default = False, action='store_true')
-parser.add_argument('-d', '--output-dir', help='Output dir (default ./patchmypcfree/)', default=os.path.abspath(os.path.join(os.getcwd(), './patchmypcfree/')))
+main_grp = parser.add_argument_group('Main parameters')
+main_grp.add_argument('-i', '--input-file', help="Input file", required = True)
+main_grp.add_argument('-o', '--output-dir', help='Output dir (default: ./patchmypcfree/)', default=os.path.abspath(os.path.join(os.getcwd(), './patchmypcfree/')))
+main_grp.add_argument('-s', '--do-not-download', help="Do not download anything, simply print download URLs", default = False, action='store_true')
 
-def return_dl_url(pkg):
-    return pkg['dl']['dl_url']    
+dl_grp = parser.add_argument_group('Download parameters')
+dl_grp.add_argument('-d', '--display', help='Display download progress (default: False)', default=False, action='store_true')
+dl_grp.add_argument('-c', '--concurrent', help='Number of concurrent downloads (default: 10)', default=10, type=int)
 
-def download_file(pkg, options):
-    download_went_well = True
-    pkgname, pkg = pkg
-    pkg_dir = pkg['output_dir']
-    pkg_url = ''
-    
-    if not os.path.exists(pkg_dir):
-        Path(pkg_dir).mkdir(parents=True, exist_ok=True)
-    
-    if 'dl' in pkg.keys():
-            pkg_url = return_dl_url(pkg)
-    
-    if pkg_url and pkg_dir:
-        dl = pypdl.Pypdl(allow_reuse=False)
-
-        dl_result = dl.start( url = pkg_url,
-                              file_path = pkg_dir,
-                              block=True,
-                              clear_terminal=False,
-                              display=False
-                            )
-        
-        if dl.completed:
-            if dl.failed:
-                download_went_well = False
-
-    return download_went_well
+def get_dl_url(pkg):
+    return pkg['dl']['dl_url']
 
 def download_files(pkgs_list, options):
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        futs = [ (pkg[0], executor.submit(functools.partial(download_file, pkg, options)))
-            for pkg in pkgs_list.items() ]
+    tasks = []
 
-    for pkgname, pkg_val in futs:
-        ret = pkg_val.result()
-        if not(ret):
-            print("[!] Download of the package '%s' encountered in issue" % pkgname)
-    return None
+    dl = pypdl.Pypdl(allow_reuse=False, max_concurrent = options.concurrent)
     
+    for pkgname, pkg in pkgs_list.items():
+        pkg_dir = pkg['output_dir']
+        pkg_url = ''
+
+        if not os.path.exists(pkg_dir):
+            Path(pkg_dir).mkdir(parents=True, exist_ok=True)
+        
+        if 'dl' in pkg.keys():
+            pkg_url = get_dl_url(pkg)
+        
+        if pkg_url and pkg_dir:
+            tasks.append( {'url': pkg_url, 'file_path': pkg_dir } )
+
+    dl_result = dl.start(   tasks = tasks,
+                            block=True,
+                            clear_terminal=False,
+                            display=options.display
+                        )
+    if dl.completed:
+        dl_fails = dl.failed
+        if dl_fails:
+            for dl_fail in dl_fails:
+                print("[!] The following package URL encountered an issue: '%s'" % dl_fail)
+    
+    return None
+
 def list_dl_links(pkgs_list):
     for pkgname, pkg in pkgs_list.items():
         if 'dl' in pkg.keys():
-            print(return_dl_url(pkg))
+            print(get_dl_url(pkg))
     return None
 
-def extract(pkgname):
+def extract(root, pkgname):
     elem  = {}
-
-    content = requests.get(PATCHMYPC_FREE_DEFINITIONS).content.decode('utf-8')
-    root = fromstringxml(bytes(content, encoding='utf-8'))
 
     link = root.xpath("//{}/text()".format(pkgname))
     link = link[0] if len(link) == 1 else ''
@@ -106,13 +99,16 @@ def search(options, pkgs_list):
                 
                 pkgs_list[pkgname] = {'output_dir': output_dir}
 
+    content = requests.get(PATCHMYPC_FREE_DEFINITIONS).content.decode('utf-8')
+    xmlroot = fromstringxml(bytes(content, encoding='utf-8'))
+
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        futs = [ (pkgname, executor.submit(functools.partial(extract, pkgname)))
+        futs = [ (pkgname, executor.submit(functools.partial(extract, xmlroot, pkgname)))
             for pkgname, pkg in pkgs_list.items() ]
     
-    for pkgname, pkg_extract in futs:
-        if pkgname in pkgs_list.keys():
-            pkgs_list[pkgname] = {**pkgs_list[pkgname], **pkg_extract.result()}
+        for pkgname, pkg_extract in futs:
+            if pkgname in pkgs_list.keys():
+                pkgs_list[pkgname] = {**pkgs_list[pkgname], **pkg_extract.result()}
     
     return None
 
