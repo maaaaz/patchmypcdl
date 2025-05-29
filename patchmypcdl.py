@@ -51,10 +51,10 @@ def download_files(pkgs_list, options):
         if pkg_url and pkg_dir:
             tasks.append( {'url': pkg_url, 'file_path': pkg_dir } )
 
-    dl_result = dl.start(   tasks = tasks,
-                            block=True,
-                            clear_terminal=False,
-                            display=options.display
+    dl_result = dl.start( tasks = tasks,
+                          block=True,
+                          clear_terminal=False,
+                          display=options.display
                         )
     if dl.completed:
         dl_fails = dl.failed
