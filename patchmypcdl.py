@@ -29,7 +29,7 @@ main_grp.add_argument('-s', '--do-not-download', help="Do not download anything,
 dl_grp = parser.add_argument_group('Download parameters')
 dl_grp.add_argument('-d', '--display', help='Display download progress (default: False)', default=False, action='store_true')
 dl_grp.add_argument('-c', '--concurrent', help='Number of concurrent downloads (default: 10)', default=10, type=int)
-dl_grp.add_argument('-t', '--timeout', help='Max timeout in seconds to download a file (default: 30)', default=30, type=int)
+dl_grp.add_argument('-t', '--timeout', help='Max timeout in seconds to download a file (default: 20)', default=20, type=int)
 
 def get_dl_url(pkg):
     return pkg['dl']['dl_url']
