@@ -14,6 +14,7 @@ import pprint
 
 from lxml.etree import fromstring as fromstringxml
 import pypdl
+import aiohttp
 
 # Globals
 VERSION = '1.0'
