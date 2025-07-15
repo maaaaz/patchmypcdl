@@ -55,7 +55,6 @@ def download_files(pkgs_list, options):
 
     dl_result = dl.start( tasks = tasks,
                           block=True,
-                          clear_terminal=False,
                           display=options.display,
                           timeout=aiohttp.ClientTimeout(sock_read=options.timeout)
                         )
