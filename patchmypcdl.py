@@ -96,7 +96,7 @@ def search(options, pkgs_list):
                 pkgname  = line
                 output_dir = options.output_dir
                 
-                if ' | ' in line:
+                if (' | ' in line) and not(line.startswith('#"):
                     pkgname, output_dir = line.split(' | ')
                 
                 pkgs_list[pkgname] = {'output_dir': output_dir}
